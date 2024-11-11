@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Adding Bootstrap, Title and JQuery in the Head section -->
+    <meta name="viewport" charset="UTF-8" content="width=device-width, initial-scale=1.0">
+    <title>Region Matching</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
+          integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" rel="stylesheet">
+</head>
+<body>
+<!--
+Body of the page with the main content
+
+Many of the elements are created dynamically using JQuery
+
+I have done this because the content of the page is dependent on the user's selection
+
+-->
+<h1>Match Countries with their flags</h1>
+<h2>Select a region:</h2>
+<!--
+Radio buttons for the user to select a region
+
+The regions are fetched from the API and displayed as radio buttons
+-->
+<div id="radioButtons">
+</div>
+<!--
+Board size radio buttons
+The user can select the size of the board they want to play with
+We then use the value of the selected radio button to determine the number of cards to display
+-->
+<div id="boardSizeHeader">
+    <h1>Board Size:</h1>
+    <label>
+        <input name="boardSize" type="radio" value="4x2">
+        4x2
+    </label>
+    <label>
+        <input name="boardSize" type="radio" value="4x4">
+        4x4
+    </label>
+</div>
+<!--
+Country Cards
+A section where cards are placed onto the screen in a randomised order
+-->
+<div id="cards">
+</div>
+<!--
+Messages section
+I will place all the other messages like congratulation messages here
+-->
+<div id="messages">
+    <p id="result">Number Of Matches: 0</p>
+</div>
+<!--
+This button is made for showing the answer flags
+-->
+<button id="showAnswer">Show Answer</button>
+<!-- Answer cards where cards are shown to the user along with the name and flag -->
+<div id="answerCards">
+</div>
+</body>
+<script>
+    // Defining the important variables
+    let regionName, totalMatches, cards, toSplice;
+
+    // An algorithm that allows me to shuffle the array gained
+    // From the API
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+    // Reset the game function that is called by multiple listeners
+    function resetGame() {
+        $('#cards').empty();
+        $('.card').empty()
+        $('#answerCards').empty();
+        $('#endMsg').remove();
+        $('#result').text("Number of Matches: 0").css('display', 'none');
+        $('#showAnswer').css('display', 'none');
+        totalMatches = 0;
+        cards = [];
+    }
+    // This function is made so when we have all the matches we need
+    // We will return true
+    function checkAllMatched() {
+        let allMatched = true;
+        $('.card').each(function() {
+            if (!$(this).hasClass('matched')) {
+                allMatched = false;
+                return false; // Break out of the loop
+            }
+        });
+        return allMatched;
+    }
+
+    $(document).ready(function () {
+        // Get request to get all regions
+        $.getJSON("https://www.cs.kent.ac.uk/people/staff/yh/api/country-data/countries/regions",
+            (data) => {
+            // Fetching the API and sorting it to remove Antartic region
+                for (let i = 0; i < data.length; i++) {
+                    if(data[i] !== "Antarctic") {
+                        // Appending the radio buttons to our section #radioButtons
+                        $('#radioButtons').append(`
+                        <input type="radio" name="region" value="${data[i]}">
+                        <label>${data[i]}</label>
+                    `);
+                    }
+                }
+            });
+        // Radio Buttons listener
+        $('#radioButtons').click(function () {
+            // Upon clicking this button we will reset the game
+            resetGame();
+            // Uncheck board size radio buttons
+            $('input[name="boardSize"]').prop('checked', false);
+            let radioButtonsChecked = $('input[name="region"]:checked');
+            if (radioButtonsChecked.length > 0) {
+                // Set the region name and display boardSize header
+                regionName = radioButtonsChecked.val();
+                $('#boardSizeHeader').css('display', 'block');
+            }
+        });
+        // Board Size listener
+        $('input[name="boardSize"]').click(function () {
+            // Upon clicking this button we will reset the game
+            resetGame();
+            let radioButtonsChecked = $('input[name="boardSize"]:checked');
+            if (radioButtonsChecked.length > 0) {
+                // Upon selecting one of the board size radio buttons
+                // We will display showAnswer and result html elements
+                $('#result').css('display', 'block');
+                $('#showAnswer').css('display', 'block');
+                let boardSize = radioButtonsChecked.val();
+                // We will use this conditional statement to determine
+                // How many elements to splice
+                // So we don't have to duplicate code
+                toSplice = 8;
+                if (boardSize === "4x2") {
+                    toSplice = 4;
+                }
+                // Get request with regionName
+                $.getJSON("https://www.cs.kent.ac.uk/people/staff/yh/api/country-data/countries/region/" + regionName,
+                    (data) => {
+                    // We shuffle the data we got
+                        shuffleArray(data);
+                        // Splice that data from 0 to the variable toSplice
+                        let selectedCountries = data.slice(0, toSplice);
+                        // Loop through selectedCountries
+                        for (let i = 0; i < selectedCountries.length; i++) {
+                            // For each iteration we will add two card elements
+                            // One with the flag and other with the name and capital
+                            // Both will have data-country= name of the country
+                            cards.push(`
+                                <div class="col-md-3">
+                                    <div class="card" data-country="${selectedCountries[i].name}" data-capital="${selectedCountries[i].capital}" style="width: 18rem;">
+                                        <img class="card-img-top" src="${selectedCountries[i].flag}" alt="Flag of ${selectedCountries[i].name}">
+                                    </div>
+                                </div>
+                            `);
+                            cards.push(`
+                                <div class="col-md-3">
+                                    <div class="card" data-country="${selectedCountries[i].name}" style="width: 18rem;">
+                                        <div class="card-body">
+                                            <h5 class="card-title">${selectedCountries[i].name}</h5>
+                                            <h6 class="card-subtitle mb-2 text-muted">Capital: ${selectedCountries[i].capital}</h6>
+                                        </div>
+                                    </div>
+                                </div>
+                            `);
+                        }
+                        // We then shuffle the cards array to randomise the order in which
+                        // They get placed onto the screen
+                        shuffleArray(cards);
+                        // We make sure #cards is empty and append a new div called row
+                        $('#cards').empty().append('<div class="row"></div>');
+                        // Loop through cards
+                        for (let i = 0; i < cards.length; i++) {
+                            // Append cards[i] to row
+                            $('.row').append(cards[i]);
+                        }
+                        // Define Selected Cards
+                        let selectedCards = [];
+                        // Listener for Country Cards
+                        $('.card').click(function () {
+                            // If the array has a length less than 2 and the current selection does not have the class
+                            // matched we proceed
+                            if (selectedCards.length < 2 && !$(this).hasClass('matched')) {
+                                // Upon clicking we add class 'selected'
+                                $(this).addClass('selected');
+                                // add this selection to selectedCards
+                                selectedCards.push($(this));
+                                // if selectedCards has a length of 2 we proceed
+                                if (selectedCards.length === 2) {
+                                    // Get the card's country name
+                                    let card1 = selectedCards[0].data('country');
+                                    let card2 = selectedCards[1].data('country');
+                                    // If they both are the same we proceed
+                                    if (card1 === card2) {
+                                        // Add the class matched upon successfully matching country names
+                                        selectedCards[0].addClass('matched');
+                                        selectedCards[1].addClass('matched');
+                                        // Add total matches text along with a counter
+                                        $('#result').text('Number of Matches: ' + ++totalMatches);
+                                    }
+                                    // Timeout mainly used in the case of a wrong selection
+                                    // Allowing the user to acknowledge the matching is wrong
+                                    // Whilst also removing the selected class to ensure that we don't
+                                    // Have any selected classes for those that are already matched
+                                    setTimeout(() => {
+                                        selectedCards[0].removeClass('selected');
+                                        selectedCards[1].removeClass('selected');
+                                        // Reset selected cards
+                                        selectedCards = [];
+                                    }, 500);
+                                }
+                            }
+                            // Calling the function checkAllMatched
+                            if (checkAllMatched()) {
+                                // If true append the congrats message
+                                $('#messages').append('<p id="endMsg">Congratulations You Have Won!</p>');
+                            }
+                        });
+                        // Show Answer Button Listener
+                        $('#showAnswer').click(function () {
+                            // Set the variable so it's readable
+                            let answerCardsContainer = $('#answerCards');
+                            // Ensure it's empty for future use
+                            answerCardsContainer.empty();
+                            // Each iteration of card classes
+                            $('.card').each(function () {
+                                // Country data from the card
+                                let country = $(this).data('country');
+                                // Capital data from the card
+                                let capital = $(this).data('capital');
+                                // Flag image from the card
+                                let flag = $(this).find('img').attr('src');
+                                // Flag is not null statement, so we don't post duplicate answer card's
+                                if (flag != null) {
+                                    // Define answer card which build's the answer card with a flag and country name
+                                    let answerCard = $(`
+                                    <div class="answer-card">
+                                            <div class="answer-card-body">
+                                                <h5>${country}</h5>
+                                                <h6>Capital: ${capital}</h6>
+                                           </div>
+                                        <img class='answer-card-img' src="${flag}" alt="Flag of ${country}">
+                                       </div>
+                                `);
+                                    // Append to the answerCards container
+                                answerCardsContainer.append(answerCard);
+                                }
+                            });
+                        });
+                    });
+            }
+        });
+    });
+</script>
+<style>
+    /* Base styles */
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f8f9fa;
+        margin: 20px;
+        text-align: center;
+    }
+
+    h1, h2 {
+        color: #343a40;
+    }
+
+    #radioButtons, #boardSizeHeader {
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: center;
+    }
+
+    #boardSizeHeader {
+        display: none;
+    }
+
+    #showAnswer {
+        display: none;
+    }
+
+    #result {
+        display: none;
+    }
+
+    #radioButtons input, #boardSizeHeader input {
+        margin-right: 5px;
+    }
+
+    #radioButtons label, #boardSizeHeader label {
+        margin-right: 15px;
+    }
+
+    #endMsg {
+        font-size: 1.2em;
+        color: #28a745;
+        margin-top: 20px;
+        clear: both;
+    }
+
+    #cards {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+
+    .card {
+        width: 18rem;
+        height: 12rem;
+        margin: 10px;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .card:hover {
+        transform: scale(1.05);
+    }
+
+    .card.selected {
+        border: 3px solid orange;
+    }
+
+    .card.matched {
+        border: 3px solid green;
+        cursor: auto;
+    }
+
+    .card-img-top, .answer-card-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    #result, #endMsg {
+        font-size: 1.2em;
+        color: #28a745;
+        margin-top: 20px;
+    }
+
+    #showAnswer {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 1em;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        text-align: center;
+        margin: 0 auto;
+    }
+
+    #showAnswer:hover {
+        background-color: #0056b3;
+    }
+
+    #answerCards {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 20px;
+        gap: 10px; /* Add gap between answer cards */
+    }
+
+    .answer-card {
+        width: 10rem;
+        height: 10rem;
+        margin: 10px;
+        text-align: center;
+        border: 1px solid #ccc;
+        background-color: #f0f0f0;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 10px;
+        box-sizing: border-box;
+    }
+
+    .answer-card-body {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .answer-card-img {
+        width: 50%;
+        height: auto;
+        margin: 0 auto;
+        object-fit: contain;
+    }
+
+    .answer-card h5, .answer-card h6 {
+        margin: 5px 0;
+    }
+
+    #answerCards h5, #answerCards h6 {
+        margin: 5px 0;
+    }
+
+    /* Media queries for responsiveness */
+    @media only screen and (max-width: 1200px) {
+        .card {
+            width: 16rem;
+            height: 10rem;
+        }
+    }
+
+    @media only screen and (max-width: 992px) {
+        .card {
+            width: 14rem;
+            height: 9rem;
+        }
+    }
+
+    @media only screen and (max-width: 768px) {
+        .card {
+            width: 12rem;
+            height: 8rem;
+        }
+
+        .answer-card {
+            width: 8rem;
+            height: 5rem;
+        }
+    }
+
+    @media only screen and (max-width: 576px) {
+        .card {
+            width: 10rem;
+            height: 7rem;
+        }
+
+        .answer-card {
+            width: 7rem;
+            height: 4rem;
+        }
+
+        #showAnswer {
+            width: 100%;
+            padding: 10px;
+        }
+    }
+</style>
+</html>
